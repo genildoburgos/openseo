@@ -1,9 +1,10 @@
 services:
   open-seo:
     image: ${OPEN_SEO_IMAGE:-ghcr.io/every-app/open-seo:latest}
-    build:
-      context: https://github.com/every-app/open-seo.git#main
-      dockerfile: deploy/docker/Dockerfile
+    # Desativado build remoto para poupar CPU/RAM da VPS; utiliza imagem pré-construída
+    # build:
+    #   context: https://github.com/every-app/open-seo.git#main
+    #   dockerfile: deploy/docker/Dockerfile
     container_name: open-seo
     restart: unless-stopped
     env_file:
@@ -21,7 +22,7 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
       - VITE_SHOW_DEVTOOLS=false
-      - NODE_OPTIONS=--max-old-space-size=3584
+      - NODE_OPTIONS=--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE:-1536}
     ports:
       - "127.0.0.1:${OPENSEO_HOST_PORT:-3005}:3001"
     volumes:
@@ -35,7 +36,7 @@ services:
       timeout: 10s
       retries: 10
       start_period: 300s
-    mem_limit: 4096m
+    mem_limit: ${OPENSEO_MEM_LIMIT:-2048m}
 
   tunnel:
     image: cloudflare/cloudflared:latest
@@ -49,6 +50,8 @@ services:
     depends_on:
       open-seo:
         condition: service_healthy
+    profiles:
+      - tunnel
 
 volumes:
   open_seo_data:
