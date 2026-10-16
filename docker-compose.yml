@@ -1,0 +1,54 @@
+services:
+  open-seo:
+    image: ${OPEN_SEO_IMAGE:-ghcr.io/every-app/open-seo:latest}
+    build:
+      context: https://github.com/every-app/open-seo.git#main
+      dockerfile: deploy/docker/Dockerfile
+    container_name: open-seo
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - CLOUDFLARE_INCLUDE_PROCESS_ENV=true
+      - PORT=3001
+      - ALLOWED_HOST=${OPENSEO_ALLOWED_HOST:-localhost}
+      - AUTH_MODE=local_noauth
+      - OPENSEO_TELEMETRY_DISABLED=${OPENSEO_TELEMETRY_DISABLED:-1}
+      - DO_NOT_TRACK=${DO_NOT_TRACK:-1}
+      - DATAFORSEO_API_KEY=${DATAFORSEO_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
+      - VITE_SHOW_DEVTOOLS=false
+      - NODE_OPTIONS=--max-old-space-size=3584
+    ports:
+      - "127.0.0.1:${OPENSEO_HOST_PORT:-3005}:3001"
+    volumes:
+      - open_seo_data:/app/.wrangler
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "fetch('http://127.0.0.1:3001/api/health').then(function(r){process.exit(r.ok?0:1)}).catch(function(){process.exit(1)})"
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+    mem_limit: 4096m
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: open-seo-tunnel
+    restart: unless-stopped
+    command: [tunnel, --no-autoupdate, run]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      open-seo:
+        condition: service_healthy
+
+volumes:
+  open_seo_data:
